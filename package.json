@@ -1,0 +1,89 @@
+{
+  "name": "codesync",
+  "displayName": "codeSync",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "capabilities": {
+  "authentication": [
+    {
+      "id": "github",
+      "label": "GitHub",
+      "supportsMultipleAccounts": false
+    }
+  ]
+},
+  "activationEvents": [
+       "onStartupFinished",
+    "onCommand:code-sync.status",
+    "onCommand:code-sync.login",
+    "onCommand:code-sync.logout",
+    "onCommand:code-sync.syncWorkspace",
+    "onCommand:code-sync.downloadWorkspace",
+    "onCommand:code-sync.debugAuth",
+    "onCommand:code-sync.debugAuthInteractive",
+    "onCommand:code-sync.debugFiles"
+
+  ],
+  "main": "./extension.js",
+   "contributes": {
+    "commands": [
+      {
+        "command": "code-sync.login",
+        "title": "CodeSync: Login"
+      },
+      {
+        "command": "code-sync.logout",
+        "title": "CodeSync: Logout"
+      },
+      {
+        "command": "code-sync.status",
+        "title": "CodeSync: Status"
+      },
+      {
+        "command": "code-sync.syncWorkspace",
+        "title": "CodeSync: Sync Workspace (Upload)"
+      },
+      {
+        "command": "code-sync.downloadWorkspace",
+        "title": "CodeSync: Download Workspace"
+      },
+      {
+        "command": "code-sync.debugAuth",
+        "title": "CodeSync: Debug Auth"
+      },
+      {
+        "command": "code-sync.debugAuthInteractive",
+        "title": "CodeSync: Debug Auth (Interactive)"
+      },
+      {
+        "command": "code-sync.debugFiles",
+        "title": "CodeSync: Debug Files"
+      }
+    ]
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "vscode-test",
+     "postinstall": "echo Installed"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.75.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.32.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.54.0",
+    "axios": "^1.11.0",
+    "form-data": "^4.0.4"
+  }
+}

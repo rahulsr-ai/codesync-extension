@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# VS Code settings
+.vscode/
+.vscode-test.mjs
+
+# Build files
+*.vsix
+out/
+dist/
+
+# Test files
+test/
+
+# Personal files
+save.txt
+saveTWO.txt
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+eslint.config.mjs
+jsconfig.json
+vsc-extension-quickstart.md
