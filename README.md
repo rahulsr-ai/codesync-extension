@@ -17,10 +17,12 @@ CodeSync makes your code instantly available on any device. Work on your laptop,
 
 ## Quick Start
 
-1. Install CodeSync from VS Code Extensions
-2. Press `Ctrl+Shift+P` → "CodeSync: Login"
-3. Grant permissions
-4. Start coding normally!
+1. **Install** CodeSync from VS Code Extensions
+2. **Login** → Press `Ctrl+Shift+P` → type "CodeSync: Login"
+3. **Choose** GitHub or Microsoft account  
+4. **Done!** Files auto-sync when you save (Ctrl+S)
+
+💡 *Your code will appear on all devices where you're logged in!*
 
 ## Commands
 
@@ -58,7 +60,7 @@ A: Cloud files are safe. Use "Download Files" to restore.
 ## Perfect For
 
 - Working between home and office
-- Switching between laptop and desktop
+- Switching between laptop and desktop  
 - Emergency backup and recovery
 - Students using lab computers + personal devices
 
