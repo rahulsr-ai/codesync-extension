@@ -8,7 +8,7 @@ const FormData = require("form-data");
 // Configuration
 // =======================
 
-const BACKEND_BASE_URL = "http://localhost:4000";
+const BACKEND_BASE_URL = "https://codesync-backend-lqy1.onrender.com";
 
 const EXCLUDE_DIRS = [
   "node_modules",
@@ -103,15 +103,16 @@ function activate(context) {
     await logoutUser(context);
   });
 
-  // Manual Download Command
-  const downloadCmd = vscode.commands.registerCommand("code-sync.downloadWorkspace", async () => {
+  // ===== NEW: UNIFIED DOWNLOAD COMMAND =====
+  const downloadFilesCmd = vscode.commands.registerCommand("code-sync.downloadFiles", async () => {
     const userInfo = context.globalState.get("codesync_user");
     if (!userInfo?.active) {
       vscode.window.showErrorMessage("❌ Please login first");
       return;
     }
     
-    await downloadWorkspaceFromCloud(context, userInfo.email);
+    console.log("Download Files command triggered");
+    await showDownloadOptions(context, userInfo.email);
   });
 
   // Debug Files Command (for troubleshooting nested files)
@@ -139,7 +140,8 @@ function activate(context) {
     }
   });
 
-  context.subscriptions.push(statusCmd, syncAllCmd, debugAuthCmd, debugAuthInteractiveCmd, loginCmd, logoutCmd, downloadCmd, debugFilesCmd);
+  // Register ALL commands properly
+  context.subscriptions.push(statusCmd, syncAllCmd, debugAuthCmd, debugAuthInteractiveCmd, loginCmd, logoutCmd, downloadFilesCmd, debugFilesCmd);
 }
 
 function deactivate() {}
@@ -248,13 +250,15 @@ async function handleCrossDeviceRestore(context, userEmail) {
       // Workspace is empty - likely new device, check for cloud files
       const choice = await vscode.window.showInformationMessage(
         "🔍 Empty workspace detected. Would you like to restore your files from the cloud?",
-        "Yes, Restore Files",
+        "Yes, Browse & Select",
         "No, Start Fresh",
         "Later"
       );
 
-      if (choice === "Yes, Restore Files") {
-        const restored = await downloadWorkspaceFromCloud(context, userEmail);
+      if (choice === "Yes, Browse & Select") {
+        console.log("User chose to browse and select files");
+        // Call the unified download options
+        const restored = await showDownloadOptions(context, userEmail);
         if (restored) {
           // Mark as synced since we just restored everything
           const syncKey = `fullSyncDone_${userEmail}`;
@@ -272,6 +276,592 @@ async function handleCrossDeviceRestore(context, userEmail) {
   } catch (error) {
     console.error("Cross-device restore failed:", error);
     vscode.window.showErrorMessage(`❌ Restore check failed: ${error.message}`);
+  }
+}
+
+// =======================
+// NEW: UNIFIED DOWNLOAD OPTIONS
+// =======================
+
+// Replace showDownloadOptions function with this simplified version:
+async function showDownloadOptions(context, userEmail) {
+  try {
+    console.log("Showing simplified download options for:", userEmail);
+    
+    // Show simplified download options
+    const downloadChoice = await vscode.window.showQuickPick([
+      {
+        label: "📥 Download All Files",
+        description: "Download all files from all workspaces",
+        detail: "Quick download of everything in your cloud storage",
+        action: "all"
+      },
+      {
+        label: "📁 Browse & Select Files",
+        description: "Choose workspace and select specific files",
+        detail: "Browse workspaces and pick exactly what you need",
+        action: "browse"
+      }
+    ], {
+      placeHolder: "Choose download method",
+      title: "CodeSync: Download Files"
+    });
+
+    if (!downloadChoice) {
+      vscode.window.showInformationMessage("Download cancelled.");
+      return false;
+    }
+
+    console.log("User selected download method:", downloadChoice.action);
+
+    switch (downloadChoice.action) {
+      case "all":
+        return await downloadAllFilesFromAllWorkspaces(context, userEmail);
+      case "browse":
+        return await browseAndSelectFiles(context, userEmail);
+      default:
+        return false;
+    }
+
+  } catch (error) {
+    console.error("Show download options failed:", error);
+    vscode.window.showErrorMessage(`❌ Failed to show download options: ${error.message}`);
+    return false;
+  }
+}
+
+// New combined function for browsing and selecting
+async function browseAndSelectFiles(context, userEmail) {
+  try {
+    console.log("Starting browse and select files");
+    vscode.window.showInformationMessage("📋 Loading your workspaces...");
+
+    // Get all workspaces
+    const workspacesResponse = await axios.get(`${BACKEND_BASE_URL}/workspaces/${encodeURIComponent(userEmail)}`, {
+      timeout: 15000
+    });
+
+    const workspaces = workspacesResponse.data.workspaces;
+    
+    if (!workspaces || workspaces.length === 0) {
+      vscode.window.showInformationMessage("No workspaces found in cloud for this account.");
+      return false;
+    }
+
+    console.log(`Found ${workspaces.length} workspaces`);
+
+    // Let user select workspace
+    const workspaceOptions = workspaces.map(ws => ({
+      label: `📁 ${ws.name}`,
+      description: `${ws.fileCount} files • ${ws.sizeMB} MB`,
+      detail: `Last modified: ${new Date(ws.lastModified).toLocaleDateString()}`,
+      workspace: ws
+    }));
+
+    const selectedWorkspace = await vscode.window.showQuickPick(workspaceOptions, {
+      placeHolder: `Select workspace to browse (${workspaces.length} available)`,
+      title: "CodeSync: Choose Workspace"
+    });
+
+    if (!selectedWorkspace) {
+      vscode.window.showInformationMessage("No workspace selected.");
+      return false;
+    }
+
+    console.log(`User selected workspace: ${selectedWorkspace.workspace.name}`);
+
+    // Ask what to download from this workspace
+    const downloadOption = await vscode.window.showQuickPick([
+      {
+        label: "📥 Download All Files from This Workspace",
+        description: `Download all ${selectedWorkspace.workspace.fileCount} files`,
+        detail: "Complete workspace download",
+        action: "all"
+      },
+      {
+        label: "🎯 Select Specific Files",
+        description: "Choose exactly which files to download",
+        detail: "Pick individual files from this workspace",
+        action: "select"
+      }
+    ], {
+      placeHolder: "What do you want to download?",
+      title: `From workspace: ${selectedWorkspace.workspace.name}`
+    });
+
+    if (!downloadOption) {
+      vscode.window.showInformationMessage("Download cancelled.");
+      return false;
+    }
+
+    console.log("User selected workspace download action:", downloadOption.action);
+
+    if (downloadOption.action === "all") {
+      return await downloadAllWorkspaceFiles(context, userEmail, selectedWorkspace.workspace.name);
+    } else {
+      return await selectiveDownloadFromWorkspace(context, userEmail, selectedWorkspace.workspace.name);
+    }
+
+  } catch (error) {
+    console.error("Browse and select files failed:", error);
+    vscode.window.showErrorMessage(`❌ Failed to browse files: ${error.message}`);
+    return false;
+  }
+}
+
+
+// =======================
+// DOWNLOAD METHOD 1: Download All Files from All Workspaces
+// =======================
+
+async function downloadAllFilesFromAllWorkspaces(context, userEmail) {
+  try {
+    console.log("Downloading all files from all workspaces");
+    vscode.window.showInformationMessage("📥 Downloading all your files from cloud...");
+
+    // Get all files using legacy endpoint
+    const fileListResponse = await axios.get(`${BACKEND_BASE_URL}/files/${encodeURIComponent(userEmail)}`, {
+      timeout: 15000
+    });
+
+    const files = fileListResponse.data.files;
+    
+    if (!files || files.length === 0) {
+      vscode.window.showInformationMessage("No files found in cloud for this account.");
+      return false;
+    }
+
+    console.log(`Found ${files.length} files total across all workspaces`);
+
+    const wsFolders = vscode.workspace.workspaceFolders;
+    if (!wsFolders?.length) {
+      vscode.window.showErrorMessage("Please open a workspace folder first.");
+      return false;
+    }
+
+    const workspacePath = wsFolders[0].uri.fsPath;
+
+    // Download files with progress
+    await vscode.window.withProgress(
+      { 
+        location: vscode.ProgressLocation.Notification, 
+        title: "Downloading all files...", 
+        cancellable: false 
+      },
+      async (progress) => {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          progress.report({
+            increment: 100 / files.length,
+            message: `${i + 1}/${files.length}: ${file.name || path.basename(file.relativePath)}`
+          });
+
+          try {
+            await downloadSingleFile(userEmail, file.relativePath, workspacePath);
+          } catch (error) {
+            console.error(`Failed to download ${file.relativePath}:`, error);
+          }
+        }
+      }
+    );
+
+    vscode.window.showInformationMessage(`✅ Downloaded all ${files.length} files from cloud!`);
+    return true;
+
+  } catch (error) {
+    console.error("Download all files failed:", error);
+    vscode.window.showErrorMessage(`❌ Failed to download all files: ${error.message}`);
+    return false;
+  }
+}
+
+// =======================
+// DOWNLOAD METHOD 2: Selective Workspace and File Download
+// =======================
+
+async function selectiveWorkspaceAndFileDownload(context, userEmail) {
+  try {
+    console.log("Starting selective workspace and file download");
+    vscode.window.showInformationMessage("📋 Loading your workspaces...");
+
+    // Get all workspaces
+    const workspacesResponse = await axios.get(`${BACKEND_BASE_URL}/workspaces/${encodeURIComponent(userEmail)}`, {
+      timeout: 15000
+    });
+
+    const workspaces = workspacesResponse.data.workspaces;
+    
+    if (!workspaces || workspaces.length === 0) {
+      vscode.window.showInformationMessage("No workspaces found in cloud for this account.");
+      return false;
+    }
+
+    console.log(`Found ${workspaces.length} workspaces`);
+
+    // Let user select workspace
+    const workspaceOptions = workspaces.map(ws => ({
+      label: `📁 ${ws.name}`,
+      description: `${ws.fileCount} files • ${ws.sizeMB} MB`,
+      detail: `Last modified: ${new Date(ws.lastModified).toLocaleDateString()}`,
+      workspace: ws
+    }));
+
+    const selectedWorkspace = await vscode.window.showQuickPick(workspaceOptions, {
+      placeHolder: `Select workspace to browse (${workspaces.length} workspaces available)`,
+      title: "CodeSync: Choose Workspace for File Selection"
+    });
+
+    if (!selectedWorkspace) {
+      vscode.window.showInformationMessage("No workspace selected.");
+      return false;
+    }
+
+    console.log(`User selected workspace: ${selectedWorkspace.workspace.name}`);
+
+    // Get files in selected workspace
+    const response = await axios.get(`${BACKEND_BASE_URL}/workspace/${encodeURIComponent(userEmail)}/${encodeURIComponent(selectedWorkspace.workspace.name)}`, {
+      timeout: 15000
+    });
+
+    const { files, count } = response.data;
+    
+    if (!files || files.length === 0) {
+      vscode.window.showInformationMessage(`No files found in workspace "${selectedWorkspace.workspace.name}".`);
+      return false;
+    }
+
+    console.log(`Found ${files.length} files in workspace ${selectedWorkspace.workspace.name}`);
+
+    // Create file selection options organized by folder
+    const fileOptions = files.map(file => {
+      const folderPath = path.dirname(file.relativePath);
+      const displayFolder = folderPath === '.' ? 'root' : folderPath;
+      
+      return {
+        label: path.basename(file.relativePath),
+        description: `${file.sizeMB} MB • 📁 ${displayFolder}`,
+        detail: `Last modified: ${new Date(file.lastModified).toLocaleString()}`,
+        picked: false,
+        file: file
+      };
+    }).sort((a, b) => a.description.localeCompare(b.description));
+
+    // Show multi-select file picker
+    const selectedOptions = await vscode.window.showQuickPick(fileOptions, {
+      canPickMany: true,
+      placeHolder: `Select files to download from "${selectedWorkspace.workspace.name}" (${count} files available)`,
+      title: `CodeSync: Select Files from ${selectedWorkspace.workspace.name}`
+    });
+
+    if (!selectedOptions || selectedOptions.length === 0) {
+      vscode.window.showInformationMessage("No files selected for download.");
+      return false;
+    }
+
+    const selectedFilePaths = selectedOptions.map(option => option.file.relativePath);
+    
+    console.log(`User selected ${selectedFilePaths.length} files from ${selectedWorkspace.workspace.name}`);
+
+    // Download selected files
+    const downloadResponse = await axios.post(`${BACKEND_BASE_URL}/download-workspace-files`, {
+      userEmail: userEmail,
+      workspaceName: selectedWorkspace.workspace.name,
+      selectedFiles: selectedFilePaths,
+      downloadAll: false
+    }, { timeout: 30000 });
+
+    const downloadedFiles = downloadResponse.data.files;
+    
+    await writeDownloadedFiles(downloadedFiles, selectedWorkspace.workspace.name);
+
+    vscode.window.showInformationMessage(
+      `✅ Downloaded ${downloadedFiles.length} selected files from workspace "${selectedWorkspace.workspace.name}"!`
+    );
+    return true;
+
+  } catch (error) {
+    console.error("Selective workspace and file download failed:", error);
+    vscode.window.showErrorMessage(`❌ Failed to download selected files: ${error.message}`);
+    return false;
+  }
+}
+
+// =======================
+// DOWNLOAD METHOD 3: Workspace-Based Download
+// =======================
+
+async function workspaceBasedDownload(context, userEmail) {
+  try {
+    console.log("Starting workspace-based download");
+    vscode.window.showInformationMessage("📋 Loading your workspaces from cloud...");
+
+    // Get all workspaces
+    const workspacesResponse = await axios.get(`${BACKEND_BASE_URL}/workspaces/${encodeURIComponent(userEmail)}`, {
+      timeout: 15000
+    });
+
+    const workspaces = workspacesResponse.data.workspaces;
+    
+    if (!workspaces || workspaces.length === 0) {
+      vscode.window.showInformationMessage("No workspaces found in cloud for this account.");
+      return false;
+    }
+
+    console.log(`Found ${workspaces.length} workspaces`);
+
+    // Let user select workspace
+    const workspaceOptions = workspaces.map(ws => ({
+      label: `📁 ${ws.name}`,
+      description: `${ws.fileCount} files • ${ws.sizeMB} MB • ${new Date(ws.lastModified).toLocaleDateString()}`,
+      detail: `Last modified: ${new Date(ws.lastModified).toLocaleString()}`,
+      workspace: ws
+    }));
+
+    const selectedWorkspace = await vscode.window.showQuickPick(workspaceOptions, {
+      placeHolder: `Select workspace to download (${workspaces.length} workspaces available)`,
+      title: "CodeSync: Choose Workspace"
+    });
+
+    if (!selectedWorkspace) {
+      vscode.window.showInformationMessage("No workspace selected.");
+      return false;
+    }
+
+    console.log(`User selected workspace: ${selectedWorkspace.workspace.name}`);
+
+    // Ask for download preference for this workspace
+    const downloadOption = await vscode.window.showQuickPick([
+      {
+        label: "📥 Download All Files from Workspace",
+        description: `Download all ${selectedWorkspace.workspace.fileCount} files from "${selectedWorkspace.workspace.name}"`,
+        detail: "Complete workspace download",
+        action: "all"
+      },
+      {
+        label: "🎯 Select Specific Files from Workspace",
+        description: "Choose exactly which files to download from this workspace",
+        detail: "Selective download within workspace",
+        action: "select"
+      }
+    ], {
+      placeHolder: "Choose download option for this workspace",
+      title: `Download from workspace: ${selectedWorkspace.workspace.name}`
+    });
+
+    if (!downloadOption) {
+      vscode.window.showInformationMessage("Download cancelled.");
+      return false;
+    }
+
+    console.log("User selected workspace download action:", downloadOption.action);
+
+    if (downloadOption.action === "all") {
+      return await downloadAllWorkspaceFiles(context, userEmail, selectedWorkspace.workspace.name);
+    } else {
+      return await selectiveDownloadFromWorkspace(context, userEmail, selectedWorkspace.workspace.name);
+    }
+
+  } catch (error) {
+    console.error("Workspace-based download failed:", error);
+    vscode.window.showErrorMessage(`❌ Failed to load workspaces: ${error.message}`);
+    return false;
+  }
+}
+
+// =======================
+// Helper Functions for Downloads
+// =======================
+
+async function downloadAllWorkspaceFiles(context, userEmail, workspaceName) {
+  try {
+    console.log(`📥 Downloading all files from workspace: ${workspaceName}`);
+
+    const response = await axios.post(`${BACKEND_BASE_URL}/download-workspace-files`, {
+      userEmail: userEmail,
+      workspaceName: workspaceName,
+      downloadAll: true
+    }, { timeout: 60000 });
+
+    const downloadedFiles = response.data.files;
+    
+    if (!downloadedFiles || downloadedFiles.length === 0) {
+      vscode.window.showInformationMessage("No files found in this workspace.");
+      return false;
+    }
+
+    await writeDownloadedFiles(downloadedFiles, workspaceName);
+
+    vscode.window.showInformationMessage(
+      `✅ Downloaded all ${downloadedFiles.length} files from workspace "${workspaceName}"!`
+    );
+    return true;
+
+  } catch (error) {
+    console.error("Download all workspace files failed:", error);
+    vscode.window.showErrorMessage(`❌ Failed to download workspace: ${error.message}`);
+    return false;
+  }
+}
+
+async function selectiveDownloadFromWorkspace(context, userEmail, workspaceName) {
+  try {
+    vscode.window.showInformationMessage("📋 Loading workspace files...");
+
+    // Get files in this workspace
+    const response = await axios.get(`${BACKEND_BASE_URL}/workspace/${encodeURIComponent(userEmail)}/${encodeURIComponent(workspaceName)}`, {
+      timeout: 15000
+    });
+
+    const { files, count } = response.data;
+    
+    if (!files || files.length === 0) {
+      vscode.window.showInformationMessage(`No files found in workspace "${workspaceName}".`);
+      return false;
+    }
+
+    console.log(`Found ${files.length} files in workspace ${workspaceName}`);
+
+    // Create selection options with better organization
+    const fileOptions = files.map(file => {
+      const folderPath = path.dirname(file.relativePath);
+      const displayFolder = folderPath === '.' ? 'root' : folderPath;
+      
+      return {
+        label: path.basename(file.relativePath),
+        description: `${file.sizeMB} MB • 📁 ${displayFolder}`,
+        detail: `Last modified: ${new Date(file.lastModified).toLocaleString()}`,
+        picked: false,
+        file: file
+      };
+    }).sort((a, b) => a.description.localeCompare(b.description));
+
+    // Show multi-select quick pick
+    const selectedOptions = await vscode.window.showQuickPick(fileOptions, {
+      canPickMany: true,
+      placeHolder: `Select files from "${workspaceName}" (${count} files available)`,
+      title: `CodeSync: Select Files from ${workspaceName}`
+    });
+
+    if (!selectedOptions || selectedOptions.length === 0) {
+      vscode.window.showInformationMessage("No files selected for download.");
+      return false;
+    }
+
+    const selectedFilePaths = selectedOptions.map(option => option.file.relativePath);
+    
+    console.log(`User selected ${selectedFilePaths.length} files from ${workspaceName}`);
+
+    // Download selected files
+    const downloadResponse = await axios.post(`${BACKEND_BASE_URL}/download-workspace-files`, {
+      userEmail: userEmail,
+      workspaceName: workspaceName,
+      selectedFiles: selectedFilePaths,
+      downloadAll: false
+    }, { timeout: 30000 });
+
+    const downloadedFiles = downloadResponse.data.files;
+    
+    await writeDownloadedFiles(downloadedFiles, workspaceName);
+
+    vscode.window.showInformationMessage(
+      `✅ Downloaded ${downloadedFiles.length} selected files from workspace "${workspaceName}"!`
+    );
+    return true;
+
+  } catch (error) {
+    console.error("Selective workspace download failed:", error);
+    vscode.window.showErrorMessage(`❌ Failed to download files: ${error.message}`);
+    return false;
+  }
+}
+
+async function writeDownloadedFiles(downloadedFiles, workspaceName) {
+  const wsFolders = vscode.workspace.workspaceFolders;
+  if (!wsFolders?.length) {
+    vscode.window.showErrorMessage("Please open a workspace folder first.");
+    return;
+  }
+
+  const workspacePath = wsFolders[0].uri.fsPath;
+
+  // Write files with progress
+  await vscode.window.withProgress(
+    { 
+      location: vscode.ProgressLocation.Notification, 
+      title: `Writing files from "${workspaceName}"...`, 
+      cancellable: false 
+    },
+    async (progress) => {
+      for (let i = 0; i < downloadedFiles.length; i++) {
+        const file = downloadedFiles[i];
+        progress.report({
+          increment: 100 / downloadedFiles.length,
+          message: `${i + 1}/${downloadedFiles.length}: ${path.basename(file.filePath)}`
+        });
+
+        try {
+          const localFilePath = path.join(workspacePath, file.filePath);
+          
+          // Create directory structure if needed
+          const dir = path.dirname(localFilePath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+            console.log(`📁 Created directory: ${dir}`);
+          }
+
+          // Write file content
+          fs.writeFileSync(localFilePath, file.content, 'utf8');
+          console.log(`✅ Created: ${file.filePath}`);
+          
+        } catch (error) {
+          console.error(`Failed to write ${file.filePath}:`, error);
+        }
+      }
+    }
+  );
+}
+
+async function downloadSingleFile(userEmail, relativePath, workspacePath) {
+  try {
+    console.log(`Attempting to download: ${relativePath}`);
+    
+    const response = await axios.post(
+      `${BACKEND_BASE_URL}/download`,
+      {
+        userEmail: userEmail,
+        filePath: relativePath
+      },
+      { timeout: 10000 }
+    );
+
+    const { content } = response.data;
+    const localFilePath = path.join(workspacePath, relativePath);
+
+    // Create directory structure if needed
+    const dir = path.dirname(localFilePath);
+    console.log(`Creating directory if needed: ${dir}`);
+    
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`✅ Directory created: ${dir}`);
+    }
+
+    // Write file content
+    fs.writeFileSync(localFilePath, content, 'utf8');
+    console.log(`✅ Downloaded: ${relativePath}`);
+
+  } catch (error) {
+    console.error(`❌ Download error for ${relativePath}:`, error.message);
+    
+    if (error.response) {
+      console.error(`HTTP Status: ${error.response.status}`);
+      console.error(`Response: ${JSON.stringify(error.response.data)}`);
+    }
+    
+    const localFilePath = path.join(workspacePath, relativePath);
+    console.error(`Attempted local path: ${localFilePath}`);
+    
+    throw error;
   }
 }
 
@@ -427,13 +1017,14 @@ async function showSyncStatus(context) {
   const fullSyncDone = context.globalState.get(syncKey);
   const syncStatus = fullSyncDone ? "✅ Full sync completed" : "⚠️ Pending full sync";
   
-  // Show file count from cloud
   try {
-    const response = await axios.get(`${BACKEND_BASE_URL}/files/${encodeURIComponent(userInfo.email)}`);
-    const fileCount = response.data.count || 0;
+    const response = await axios.get(`${BACKEND_BASE_URL}/workspaces/${encodeURIComponent(userInfo.email)}`);
+    const workspaces = response.data.workspaces || [];
+    const totalFiles = workspaces.reduce((sum, ws) => sum + ws.fileCount, 0);
+    const totalSize = workspaces.reduce((sum, ws) => sum + parseFloat(ws.sizeMB), 0);
     
     vscode.window.showInformationMessage(
-      `✅ CodeSync active for ${userInfo.email} (${userInfo.provider})\n${syncStatus}\n📁 Cloud files: ${fileCount}`
+      `✅ CodeSync active for ${userInfo.email} (${userInfo.provider})\n${syncStatus}\n📁 Workspaces: ${workspaces.length}\n📄 Total files: ${totalFiles}\n💾 Storage used: ${totalSize.toFixed(2)} MB\n🧹 Auto-cleanup: Every 3 weeks`
     );
   } catch (error) {
     vscode.window.showInformationMessage(
@@ -557,7 +1148,7 @@ function collectWorkspaceFiles(root) {
 }
 
 // =======================
-// Upload to backend
+// Upload to backend with workspace detection
 // =======================
 
 async function uploadFileToBackend(filePath, userEmail) {
@@ -566,10 +1157,12 @@ async function uploadFileToBackend(filePath, userEmail) {
     throw new Error("No workspace folder open.");
   }
   const workspacePath = wsFolders[0].uri.fsPath;
+  const workspaceName = path.basename(workspacePath); // Get workspace folder name
 
   const formData = new FormData();
   formData.append("file", fs.createReadStream(filePath));
   formData.append("userEmail", userEmail);
+  formData.append("workspaceName", workspaceName); // Include workspace name
   formData.append("relativePath", path.relative(workspacePath, filePath) || path.basename(filePath));
 
   const url = `${BACKEND_BASE_URL}/upload`;
@@ -585,121 +1178,6 @@ async function uploadFileToBackend(filePath, userEmail) {
   }
 
   return res.data;
-}
-
-// =======================
-// Cross-Device File Restoration
-// =======================
-
-async function downloadWorkspaceFromCloud(context, userEmail) {
-  try {
-    vscode.window.showInformationMessage("📥 Fetching your files from cloud...");
-
-    // Get list of files from backend
-    const fileListResponse = await axios.get(`${BACKEND_BASE_URL}/files/${encodeURIComponent(userEmail)}`, {
-      timeout: 15000
-    });
-
-    const files = fileListResponse.data.files;
-    
-    if (!files || files.length === 0) {
-      vscode.window.showInformationMessage("No files found in cloud for this account.");
-      return false;
-    }
-
-    console.log(`Found ${files.length} files in cloud for ${userEmail}`);
-    console.log("Files to download:");
-    files.forEach((file, index) => {
-      console.log(`  ${index + 1}. ${file.relativePath}`);
-    });
-
-    const wsFolders = vscode.workspace.workspaceFolders;
-    if (!wsFolders?.length) {
-      vscode.window.showErrorMessage("Please open a workspace folder first.");
-      return false;
-    }
-
-    const workspacePath = wsFolders[0].uri.fsPath;
-
-    // Download files with progress
-    await vscode.window.withProgress(
-      { 
-        location: vscode.ProgressLocation.Notification, 
-        title: "Downloading workspace files...", 
-        cancellable: false 
-      },
-      async (progress) => {
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          progress.report({
-            increment: 100 / files.length,
-            message: `${i + 1}/${files.length}: ${file.name || path.basename(file.relativePath)}`
-          });
-
-          try {
-            await downloadSingleFile(userEmail, file.relativePath, workspacePath);
-          } catch (error) {
-            console.error(`Failed to download ${file.relativePath}:`, error);
-          }
-        }
-      }
-    );
-
-    vscode.window.showInformationMessage(`✅ ${files.length} files restored to workspace!`);
-    return true;
-
-  } catch (error) {
-    console.error("Download workspace failed:", error);
-    vscode.window.showErrorMessage(`❌ Failed to fetch files: ${error.message}`);
-    return false;
-  }
-}
-
-async function downloadSingleFile(userEmail, relativePath, workspacePath) {
-  try {
-    console.log(`Attempting to download: ${relativePath}`);
-    
-    // Changed to POST method with body data to avoid path-to-regexp issues
-    const response = await axios.post(
-      `${BACKEND_BASE_URL}/download`,
-      {
-        userEmail: userEmail,
-        filePath: relativePath
-      },
-      { timeout: 10000 }
-    );
-
-    const { content } = response.data;
-    const localFilePath = path.join(workspacePath, relativePath);
-
-    // Create directory structure if needed
-    const dir = path.dirname(localFilePath);
-    console.log(`Creating directory if needed: ${dir}`);
-    
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-      console.log(`✅ Directory created: ${dir}`);
-    }
-
-    // Write file content
-    fs.writeFileSync(localFilePath, content, 'utf8');
-    console.log(`✅ Downloaded: ${relativePath}`);
-
-  } catch (error) {
-    console.error(`❌ Download error for ${relativePath}:`, error.message);
-    
-    // Enhanced error logging for debugging
-    if (error.response) {
-      console.error(`HTTP Status: ${error.response.status}`);
-      console.error(`Response: ${JSON.stringify(error.response.data)}`);
-    }
-    
-    // Log the exact path being attempted
-    const localFilePath = path.join(workspacePath, relativePath);
-    console.error(`Attempted local path: ${localFilePath}`);
-    
-    throw error;
-  }
 }
 
 // Check if workspace is empty (new device scenario)

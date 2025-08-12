@@ -1,89 +1,93 @@
 {
   "name": "codesync",
-  "displayName": "codeSync",
-  "description": "",
-  "version": "0.0.1",
-  "engines": {
-    "vscode": "^1.75.0"
+  "displayName": "CodeSync - Cross-Device Code Sync",
+  "description": "Seamlessly sync your code across multiple devices without Git commits. Auto-sync on save with GitHub/Microsoft authentication.",
+  "version": "1.0.0",
+  "publisher": "rahulsr-ai",
+  "author": {
+    "name": "Rahulsinghrawat",
+    "email": "rahulrwt.dev@gmail.com"
   },
-  "categories": [
-    "Other"
+  "license": "MIT",
+  "homepage": "https://github.com/rahulsr-ai/codesync-extension",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rahulsr-ai/codesync-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rahulsr-ai/codesync-extension/issues"
+  },
+  "keywords": [
+    "sync",
+    "cloud",
+    "cross-device",
+    "backup",
+    "github",
+    "microsoft",
+    "auto-sync",
+    "workspace",
+    "file-sync",
+    "productivity",
+    "developer-tools"
   ],
-  "capabilities": {
-  "authentication": [
-    {
-      "id": "github",
-      "label": "GitHub",
-      "supportsMultipleAccounts": false
-    }
-  ]
-},
+  "categories": [
+    "Other",
+    "Cloud",
+    "Backup"
+  ],
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "activationEvents": [
-       "onStartupFinished",
-    "onCommand:code-sync.status",
-    "onCommand:code-sync.login",
-    "onCommand:code-sync.logout",
-    "onCommand:code-sync.syncWorkspace",
-    "onCommand:code-sync.downloadWorkspace",
-    "onCommand:code-sync.debugAuth",
-    "onCommand:code-sync.debugAuthInteractive",
-    "onCommand:code-sync.debugFiles"
-
+    "onStartupFinished"
   ],
   "main": "./extension.js",
-   "contributes": {
+  "contributes": {
     "commands": [
       {
         "command": "code-sync.login",
-        "title": "CodeSync: Login"
+        "title": "CodeSync: Login",
+        "icon": "$(sign-in)"
       },
       {
-        "command": "code-sync.logout",
-        "title": "CodeSync: Logout"
+        "command": "code-sync.logout", 
+        "title": "CodeSync: Logout",
+        "icon": "$(sign-out)"
       },
       {
         "command": "code-sync.status",
-        "title": "CodeSync: Status"
+        "title": "CodeSync: Status",
+        "icon": "$(info)"
       },
       {
         "command": "code-sync.syncWorkspace",
-        "title": "CodeSync: Sync Workspace (Upload)"
+        "title": "CodeSync: Upload Current Workspace",
+        "icon": "$(cloud-upload)"
       },
       {
-        "command": "code-sync.downloadWorkspace",
-        "title": "CodeSync: Download Workspace"
+        "command": "code-sync.downloadFiles",
+        "title": "CodeSync: Download Files",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "code-sync.debugAuth",
-        "title": "CodeSync: Debug Auth"
-      },
-      {
-        "command": "code-sync.debugAuthInteractive",
-        "title": "CodeSync: Debug Auth (Interactive)"
+        "title": "CodeSync: Debug Auth",
+        "icon": "$(debug)"
       },
       {
         "command": "code-sync.debugFiles",
-        "title": "CodeSync: Debug Files"
+        "title": "CodeSync: Debug Files",
+        "icon": "$(file)"
       }
     ]
   },
-  "scripts": {
-    "lint": "eslint .",
-    "pretest": "npm run lint",
-    "test": "vscode-test",
-     "postinstall": "echo Installed"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "@types/vscode": "^1.75.0",
-    "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2",
-    "eslint": "^9.32.0"
-  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.54.0",
-    "axios": "^1.11.0",
-    "form-data": "^4.0.4"
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0"
   }
 }
