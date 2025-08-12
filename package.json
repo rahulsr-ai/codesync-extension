@@ -2,7 +2,7 @@
   "name": "crossdevicesync",
   "displayName": "CodeSync - Cross-Device Code Sync",
   "description": "Seamlessly sync your code across multiple devices without Git commits. Auto-sync on save with GitHub/Microsoft authentication.",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "publisher": "rahulsr-ai",
   "author": {
     "name": "Rahulsinghrawat",
