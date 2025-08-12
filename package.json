@@ -38,7 +38,7 @@
   "engines": {
     "vscode": "^1.60.0"
   },
-  "icon": "images/icon.png",
+  "icon": "images/refactoring.png",
   "galleryBanner": {
     "color": "#1e1e1e",
     "theme": "dark"
