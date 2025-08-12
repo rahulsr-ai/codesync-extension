@@ -1,12 +1,12 @@
 {
-  "name": "codesync",
-  "displayName": "CodeSync - Cross-Device Code Sync",
+  "name": "crossdevicesync",
+  "displayName": "CodeSync - Cross-Device Code Sync", 
   "description": "Seamlessly sync your code across multiple devices without Git commits. Auto-sync on save with GitHub/Microsoft authentication.",
-  "version": "1.0.0",
+  "version": "1.0.1", 
   "publisher": "rahulsr-ai",
   "author": {
     "name": "Rahulsinghrawat",
-    "email": "rahulrwt.dev@gmail.com"
+    "email": "rahulsinghrawat085@gmail.com"
   },
   "license": "MIT",
   "homepage": "https://github.com/rahulsr-ai/codesync-extension",
@@ -18,23 +18,11 @@
     "url": "https://github.com/rahulsr-ai/codesync-extension/issues"
   },
   "keywords": [
-    "sync",
-    "cloud",
-    "cross-device",
-    "backup",
-    "github",
-    "microsoft",
-    "auto-sync",
-    "workspace",
-    "file-sync",
-    "productivity",
-    "developer-tools"
+    "sync", "cloud", "cross-device", "backup", "github",
+    "microsoft", "auto-sync", "workspace", "file-sync",
+    "productivity", "developer-tools"
   ],
-  "categories": [
-    "Other",
-    "Cloud",
-    "Backup"
-  ],
+  "categories": ["Other"],
   "engines": {
     "vscode": "^1.60.0"
   },
@@ -44,8 +32,15 @@
     "theme": "dark"
   },
   "activationEvents": [
-    "onStartupFinished"
-  ],
+    "onStartupFinished",
+    "onCommand:code-sync.login",
+    "onCommand:code-sync.logout", 
+    "onCommand:code-sync.status",
+    "onCommand:code-sync.syncWorkspace",
+    "onCommand:code-sync.downloadFiles",
+    "onCommand:code-sync.debugAuth",
+    "onCommand:code-sync.debugFiles"
+  ],  
   "main": "./extension.js",
   "contributes": {
     "commands": [
